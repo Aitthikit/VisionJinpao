@@ -2,15 +2,20 @@ import my_Function as ff
 import pyrealsense2 as rs
 import cv2
 import numpy as np
+import math
+import time
 # Configure depth and color streams
 pipeline = rs.pipeline()
 config = rs.config()
 config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)                
 config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+config.enable_stream(rs.stream.gyro)
 # Start streaming
 pipeline.start(config)
+start_time = time.time()
 
 try:
+    prev_time = time.time()
     while True:
         # Wait for a coherent pair of frames: depth and color
         frames = pipeline.wait_for_frames()
@@ -22,7 +27,24 @@ try:
         depth_frame = aligned_frames.get_depth_frame()
         color_frame = aligned_frames.get_color_frame()
         
+        # Get gyro frame
+        gyro_frame = frames.first_or_default(rs.stream.gyro)
+        if gyro_frame:
+            # Get gyroscope data
+            gyro_data = gyro_frame.as_motion_frame().get_motion_data()
+            # Calculate time delta
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+            dt = current_time - prev_time
+            prev_time = current_time
+            # Calculate roll, pitch, and yaw
+            roll, pitch, yaw = ff.gyro_data_to_euler([gyro_data.x, gyro_data.y, gyro_data.z], dt)
+            c_r = -8.63/60 +0.28/60
+            c_p = 1.73/60 -0.64/60
+            c_y = -1.74/60 + 0.07/60
+            print("Roll: {:.2f}, Pitch: {:.2f}, Yaw: {:.2f}".format(np.degrees(roll) - (c_r*elapsed_time),np.degrees(pitch) - (c_p*elapsed_time),np.degrees(yaw) - (c_y*elapsed_time)))
         
+
         if not depth_frame or not color_frame:
             continue
         
@@ -63,9 +85,9 @@ try:
         depth_res = ff.find_res(depth_colormap)
         
         # Show detected color with RGB 
-        cv2.imshow("contour_gree",mask_green)
-        cv2.imshow("contour_blue",mask_blue)
-        cv2.imshow("contour_red",cv2.medianBlur((mask_red),9))
+        # cv2.imshow("contour_gree",mask_green)
+        # cv2.imshow("contour_blue",mask_blue)
+        # cv2.imshow("contour_red",cv2.medianBlur((mask_red),9))
         
         cv2.circle(color_image,(color_res[0]//2,color_res[1]//2),2,(0,0,255),5)         # Create a Origin circle
         for cnt in contours_red:
@@ -145,7 +167,7 @@ try:
     
         # Rendering Screen of color and depth sensor of realsense
         cv2.imshow('RealSense', color_image)
-        cv2.imshow('Depth', depth_colormap)
+        # cv2.imshow('Depth', depth_colormap)
         cv2.waitKey(1)
 
 finally:

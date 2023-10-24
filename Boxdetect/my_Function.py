@@ -28,3 +28,11 @@ def cameraFrame2cameraOrigin(position,theta):
          ,[0, 1, 0]
          ,[-np.sin(theta), 0, np.cos(theta)]]
     return np.matmul(R,position)
+roll, pitch, yaw = 0.0, 0.0, 0.0
+def gyro_data_to_euler(gyro_data, dt):
+    global roll, pitch, yaw
+    gx, gy, gz = gyro_data
+    roll += gx * dt
+    pitch += gy * dt
+    yaw += gz * dt
+    return roll, pitch, yaw

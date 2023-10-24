@@ -51,17 +51,17 @@ try:
         # color_image = color_image[100:depth_width-120, 190:depth_height-210]
         # lower_red = np.array([0, 70, 60])
         # upper_red = np.array([10, 255, 255])
-        lower_blue = np.array([70, 50, 50])
+        lower_blue = np.array([70, 100, 100])
         upper_blue = np.array([115, 255, 255])
         # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.12), cv2.COLORMAP_JET)
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.08), cv2.COLORMAP_JET)
         hsv2 = cv2.cvtColor(depth_colormap,cv2.COLOR_BGR2HSV)
         # create a mask for red color
         mask_red = cv2.medianBlur(cv2.inRange(hsv2, lower_blue, upper_blue),7)
         # print(mask_red.shape)
-        black_portion = np.zeros_like(mask_red[:, :1215])
+        black_portion = np.zeros_like(mask_red[:, :1100])
         # Concatenate the black portion with the lower part of mask_red
-        mask_red = cv2.hconcat([black_portion, mask_red[:, 1215:]])
+        mask_red = cv2.hconcat([black_portion, mask_red[:, 1100:]])
         # mask_red = mask_red[600:,:]
         # find contours in the red mask
         #contours_red, _ = cv2.findContours(cv2.medianBlur((mask_red),5), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
