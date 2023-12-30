@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 # cap = cv2.VideoCapture(0)
-cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\VisionJinpao\\holeDetect\\Assem1.mp4")
+cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\VisionJinpao\\holeDetect\\Assemm.mp4")
 if not cap.isOpened():
     print("Error: Could not open camera.")
     exit()
@@ -20,11 +20,11 @@ while True:
             gray_blurred,
             cv2.HOUGH_GRADIENT,
             dp=1,
-            minDist=50,
-            param1=50,
-            param2=30,
+            minDist=100,
+            param1=7,
+            param2=25,
             minRadius=10,
-            maxRadius=20
+            maxRadius=27
         )
         edges = cv2.Canny(gray, 50, 50,5)
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, threshold=50, minLineLength=200, maxLineGap=5)
@@ -55,7 +55,7 @@ while True:
         #resized_frame = cv2.resize(frame, (960, 540))
         #resized_black_image = cv2.resize(black_image, (960, 540))
         cv2.imshow('Webcam Circles Detection', frame)
-        #cv2.imshow('gray', edges)
+        cv2.imshow('gray', edges)
         #cv2.imshow('Detected Circles and Lines', black_image)
 
         if cv2.waitKey(1) == 27:
