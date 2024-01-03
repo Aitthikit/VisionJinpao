@@ -59,9 +59,9 @@ try:
         # create a mask for red color
         mask_red = cv2.medianBlur(cv2.inRange(hsv2, lower_blue, upper_blue),7)
         # print(mask_red.shape)
-        black_portion = np.zeros_like(mask_red[:, :1100])
+        # black_portion = np.zeros_like(mask_red[:, :1100])
         # Concatenate the black portion with the lower part of mask_red
-        mask_red = cv2.hconcat([black_portion, mask_red[:, 1100:]])
+        # mask_red = cv2.hconcat([black_portion, mask_red[:, 1100:]])
         # mask_red = mask_red[600:,:]
         # find contours in the red mask
         #contours_red, _ = cv2.findContours(cv2.medianBlur((mask_red),5), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)

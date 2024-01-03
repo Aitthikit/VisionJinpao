@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 # cap = cv2.VideoCapture(0)
-cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\VisionJinpao\\holeDetect\\Assemm.mp4")
+cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\Jinpao\\VisionJinpao\\holeDetect\\Assemm.mp4")
 if not cap.isOpened():
     print("Error: Could not open camera.")
     exit()
@@ -40,7 +40,7 @@ while True:
                 # Draw circles on the original frame
                 cv2.circle(frame, (i[0], i[1]), i[2], (0, 255, 0), 2)  # outer circle
                 cv2.circle(frame, (i[0], i[1]), 2, (0, 0, 255), 3)  # center
-
+                print(i[0], i[1])
                 # Draw circles on the black image
                 cv2.circle(black_image, (i[0], i[1]), i[2], (0, 255, 0), 2)  # outer circle
                 cv2.circle(black_image, (i[0], i[1]), 2, (0, 0, 255), 3)  # center
@@ -50,12 +50,12 @@ while True:
                 x1, y1, x2, y2 = line[0]
                 if abs(x1 - x2) < vertical_offset:
                     cv2.line(black_image, (x1, y1), (x2, y2), (0, 0, 255), 2)
-
+        cv2.imshow('Webcam Circles Detection', frame)
+        cv2.imshow('gray', edges)
         # Display the video frame
         #resized_frame = cv2.resize(frame, (960, 540))
         #resized_black_image = cv2.resize(black_image, (960, 540))
-        cv2.imshow('Webcam Circles Detection', frame)
-        cv2.imshow('gray', edges)
+        
         #cv2.imshow('Detected Circles and Lines', black_image)
 
         if cv2.waitKey(1) == 27:
