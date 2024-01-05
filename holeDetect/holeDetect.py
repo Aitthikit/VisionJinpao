@@ -11,7 +11,8 @@ if not cap.isOpened():
 while True:
     vertical_offset = 10
     ret, frame = cap.read()
-    frame = frame[:475,500:1500]
+    # frame = frame[:475,500:1500]
+    frame = cv2.resize(frame,(600,600))
     fps = cap.get(cv2.CAP_PROP_FPS)
     if ret:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
