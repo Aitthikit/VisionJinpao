@@ -1,20 +1,43 @@
-import my_Function as ff
-import pyrealsense2 as rs
+import threading
+import queue
 import cv2
+import pyrealsense2 as rs
 import numpy as np
 import time
+import my_Function as ff
 
-# Configure depth and color streams
-pipeline = rs.pipeline()
-config = rs.config()
-config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)                
-config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+# Initialize queue
+frame_queue = queue.Queue()
 
-# Start streaming
-pipeline.start(config)
-start_time = time.time()
+# Function to capture frames
+def capture_frames():
+    pipeline = rs.pipeline()
+    config = rs.config()
+    config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
+    config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+    pipeline.start(config)
 
-try:
+    try:
+        while True:
+            
+            frames = pipeline.wait_for_frames()
+            align = rs.align(rs.stream.depth)
+            aligned_frames = align.process(frames)
+            depth_frame = aligned_frames.get_depth_frame()
+            color_frame = aligned_frames.get_color_frame()
+
+            if not depth_frame or not color_frame:
+                continue
+
+            depth_image = np.asanyarray(depth_frame.get_data())
+            color_image = np.asanyarray(color_frame.get_data())
+
+            frame_queue.put((depth_image, color_image))
+    finally:
+        pipeline.stop()
+
+# Function to process frames
+def process_frames():
     frame_count = 0
     start_time = time.time()
     while True:
@@ -29,24 +52,11 @@ try:
         if elapsed_time > 1:
             frame_count = 0
             start_time = time.time()
-            
-        # Wait for a coherent pair of frames: depth and color
-        frames = pipeline.wait_for_frames()
+        depth_image, color_image = frame_queue.get()
         
-        # Align the RGB and Depth frames
-        align = rs.align(rs.stream.depth)
-        aligned_frames = align.process(frames)
-        
-        # Extract the aligned RGB and Depth frames from the aligned frames
-        depth_frame = aligned_frames.get_depth_frame()
-        color_frame = aligned_frames.get_color_frame()
-        
-        if not depth_frame or not color_frame:
-            continue
-        
-        # Convert images to numpy arrays
-        depth_image = np.asanyarray(depth_frame.get_data())
-        color_image = np.asanyarray(color_frame.get_data())
+        # The rest of your processing code goes here
+        # For example:
+        # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
         hsv = cv2.cvtColor(color_image,cv2.COLOR_BGR2HSV)
 
         # Create HSV range as numpy array
@@ -81,9 +91,9 @@ try:
         depth_res = ff.find_res(depth_colormap)
         
         # Show detected color with RGB 
-        # cv2.imshow("contour_gree",mask_green)
-        # cv2.imshow("contour_blue",mask_blue)
-        # cv2.imshow("contour_red",cv2.medianBlur((mask_red),9))
+        cv2.imshow("contour_gree",mask_green)
+        cv2.imshow("contour_blue",mask_blue)
+        cv2.imshow("contour_red",cv2.medianBlur((mask_red),9))
         
         cv2.circle(color_image,(color_res[0]//2,color_res[1]//2),2,(0,0,255),5)         # Create a Origin circle
         for cnt in contours_red:
@@ -134,7 +144,6 @@ try:
                 else :
                     # cv2.putText(color_image, "Color Strip", (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2) 
                     pass
-                
         # loop through the blue contours and draw a rectangle around them
         for cnt in contours_blue:
             contour_area = cv2.contourArea(cnt)
@@ -161,13 +170,23 @@ try:
                     pass
             # Create center in depth screen to reference        
             cv2.circle(depth_colormap,(depth_res[0]//2, depth_res[1]//2),2,(255,255,255),3) 
-    
-        # Rendering Screen of color and depth sensor of realsense
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         cv2.imshow('RealSense', color_image)
         cv2.imshow('Depth', depth_colormap)
-        cv2.waitKey(1)
 
-finally:
-    # Stop streaming
-    pipeline.stop()
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
     cv2.destroyAllWindows()
+
+# Create threads
+capture_thread = threading.Thread(target=capture_frames, daemon=True)
+processing_thread = threading.Thread(target=process_frames, daemon=True)
+
+# Start threads
+capture_thread.start()
+processing_thread.start()
+
+# Join threads
+capture_thread.join()
+processing_thread.join()
