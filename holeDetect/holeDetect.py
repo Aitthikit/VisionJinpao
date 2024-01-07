@@ -11,7 +11,8 @@ if not cap.isOpened():
 while True:
     vertical_offset = 10
     ret, frame = cap.read()
-    frame = frame[:475,500:1500]
+    # frame = frame[:475,500:1500]
+    frame = cv2.resize(frame,(600,600))
     fps = cap.get(cv2.CAP_PROP_FPS)
     if ret:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -53,10 +54,10 @@ while True:
         cv2.imshow('Webcam Circles Detection', frame)
         cv2.imshow('gray', edges)
         # Display the video frame
-        #resized_frame = cv2.resize(frame, (960, 540))
-        #resized_black_image = cv2.resize(black_image, (960, 540))
+        resized_frame = cv2.resize(frame, (960, 540))
+        resized_black_image = cv2.resize(black_image, (960, 540))
         
-        #cv2.imshow('Detected Circles and Lines', black_image)
+        cv2.imshow('Detected Circles and Lines', black_image)
 
         if cv2.waitKey(1) == 27:
             break
