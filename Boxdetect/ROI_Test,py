@@ -1,0 +1,186 @@
+import numpy as np
+import pyrealsense2 as rs
+import cv2
+import time
+import my_Function as ff
+import math
+
+# Initialize the RealSense pipeline
+pipeline = rs.pipeline()
+config = rs.config()
+config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
+config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
+pipeline.start(config)
+box_list = []
+ans =[["","",""],["","",""],["","",""]]
+angle = 0
+
+
+    # print(angle_degrees)
+    # print(d_left)
+    # print(d_right)
+    # return ans
+
+            
+try:
+    frame_count = 0
+    start_time = time.time()
+
+    while True:
+        frame_count += 1
+        current_time = time.time()
+        elapsed_time = current_time - start_time
+        
+        if elapsed_time > 0:  # Avoid division by zero
+            fps = frame_count / elapsed_time
+            print(f"FPS: {fps}", end='\r')
+            
+        if elapsed_time > 1:
+            frame_count = 0
+            start_time = time.time()
+            box_list = []
+
+        depth_data, color_data = ff.align(pipeline)
+        contour_area = ff.create_ROI(0.5,1.25,color_data, depth_data)
+        
+        hsv = cv2.cvtColor(contour_area,cv2.COLOR_BGR2HSV)
+        
+        lower_green = np.array([70, 60, 60]) 
+        upper_green = np.array([85, 255, 255])
+        
+        lower_red = np.array([170, 55, 50])
+        upper_red = np.array([180, 255, 255])
+        
+        lower_blue = np.array([90, 60, 60])
+        upper_blue = np.array([110, 255, 255])
+        
+        # create a mask 
+        mask_green = cv2.medianBlur(cv2.inRange(hsv, lower_green, upper_green),7)
+        mask_blue = cv2.medianBlur(cv2.inRange(hsv, lower_blue, upper_blue),7)
+        mask_red = cv2.medianBlur(cv2.inRange(hsv, lower_red, upper_red),7)
+
+        # find contours 
+        contours_red, _ = cv2.findContours(mask_red, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_green, _ = cv2.findContours(mask_green, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_blue, _ = cv2.findContours(mask_blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)       
+        contours = [contours_red,contours_green,contours_blue]
+        # cv2.imshow("contour_gree",cv2.resize(mask_green,(mask_green.shape[1]//2,mask_green.shape[0]//2)))
+        # cv2.imshow("contour_blue",cv2.resize(mask_blue,(mask_blue.shape[1]//2,mask_blue.shape[0]//2)))
+        # cv2.imshow("contour_red",cv2.resize(mask_red,(mask_red.shape[1]//2,mask_red.shape[0]//2)))
+        
+        contour_area_image = contour_area.copy()
+        plot = np.zeros_like(contour_area_image)
+        # ff.find_color(contours,contour_area_image,plot,depth_data,box_list)
+        for contour in contours[0]:
+            contour_area = cv2.contourArea(contour)
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)                
+                cv2.rectangle(contour_area_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+                cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)  
+                if (w/h < 1.5) & (h/w < 1.5):
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(0,0,255),3)  
+                    pos = ff.find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+                    # cv2.putText(contour_area_image, "Box", (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
+                    # cv2.line(contour_area_image,(x+int(w)//2 -80,y+int(h)//2),(x+int(w)//2+80 ,y+int(h)//2),(255,255,255),2)
+                    # cv2.line(contour_area_image,(x+int(w)//2,y+int(h)//2-80),(x+int(w)//2 ,y+int(h)//2+80),(255,255,255),2)
+                    # cv2.putText(contour_area_image, "x: " + str(round(pos[0],2)) + " mm ", (x, y+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    # cv2.putText(contour_area_image, "y: " + str(round(pos[1],2)) + " mm ", (x, y+70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    box_list.append([x,y,depth_value,"Red"])
+                elif(w/h>8) & (w/h<13):
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                elif(w/h>1.5) & (w/h<2.5) :
+                    cv2.putText(contour_area_image, "XXX " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(0,0,255),3)  
+                    box_list.append([x,y,depth_value,"Red"])
+                else :
+                    pass
+
+        for contour in contours[1]:
+            contour_area = cv2.contourArea(contour)
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(contour_area_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)  
+                if (w/h < 1.5) & (h/w < 1.5):
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(0,255,0),3) 
+                    pos = ff.find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+                    depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+
+                    # cv2.putText(contour_area_image, "Box", (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
+                    # cv2.line(contour_area_image,(x+int(w)//2 -80,y+int(h)//2),(x+int(w)//2+80 ,y+int(h)//2),(255,255,255),2)
+                    # cv2.line(contour_area_image,(x+int(w)//2,y+int(h)//2-80),(x+int(w)//2 ,y+int(h)//2+80),(255,255,255),2)
+                    # cv2.putText(contour_area_image, "x: " + str(round(pos[0],2)) + " mm ", (x, y+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    # cv2.putText(contour_area_image, "y: " + str(round(pos[1],2)) + " mm ", (x, y+70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    box_list.append([x,y,depth_value,"Green"])
+                    # x+=1
+                elif(w/h>8) & (w/h<13):
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                elif(w/h>1.5) & (w/h<2.5) :
+                    cv2.putText(contour_area_image, "XXX " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(0,255,0),3) 
+                    box_list.append([x,y,depth_value,"Green"])
+                else :
+                    pass
+
+        for contour in contours[2]:
+            contour_area = cv2.contourArea(contour)
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)
+                cv2.rectangle(contour_area_image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)  
+                if (w/h < 1.5) & (h/w < 1.5):
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(255,0,0),3) 
+                    pos = ff.find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+                    depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+
+                    # cv2.putText(contour_area_image, "Box", (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
+                    # cv2.line(contour_area_image,(x+int(w)//2 -80,y+int(h)//2),(x+int(w)//2+80 ,y+int(h)//2),(255,255,255),2)
+                    # cv2.line(contour_area_image,(x+int(w)//2,y+int(h)//2-80),(x+int(w)//2 ,y+int(h)//2+80),(255,255,255),2)
+                    # cv2.putText(contour_area_image, "x: " + str(round(pos[0],2)) + " mm ", (x, y+45), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    # cv2.putText(contour_area_image, "y: " + str(round(pos[1],2)) + " mm ", (x, y+70), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    box_list.append([x,y,depth_value,"Blue"])
+                elif(w/h>6) & (w/h<13):
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                elif(w/h>1.5) & (w/h<2.5) :
+                    cv2.putText(contour_area_image, "XXX " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,(255,0,0),3) 
+                    box_list.append([x,y,depth_value,"Blue"])
+                else :
+                    pass
+        
+        # print(box_list,end='\n')
+        # print(len(box_list))
+
+
+        # cv2.imshow("Depth", depth_roi_image)
+        # cv2.imshow("RGB Frame with Contour Area", contour_area)
+        cv2.imshow("RGB Frame", contour_area_image)
+        cv2.imshow("Plot ", plot)
+        # print(box_list)
+        if len(box_list)>0:
+        #     print(find_table(box_list),end='\r')
+            ans,angle = ff.find_table(box_list,ans)
+            print(ans,angle)
+        # Wait for a key press, and exit the loop if 'q' is pressed
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):
+            break
+
+except KeyboardInterrupt:
+    pass
+finally:
+    pipeline.stop()
+    cv2.destroyAllWindows()
