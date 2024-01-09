@@ -15,7 +15,6 @@ def cost_function(color, position, robot_pos):
         cost = np.abs(position[0] - robot_pos[0]) * Vx + np.abs(position[1] + offset - robot_pos[1]) * Vy
         return cost, [position[0], position[1] + offset]
 
-print(cost_function("green", [2,2], [2,2]))
 def BoxPath(robot_init ,BoxColor):
     # Init min Cost
     min_cost = float('inf')
@@ -50,7 +49,7 @@ def BoxPath(robot_init ,BoxColor):
 
     return min_path, color, min_cost, CostA
 
-boxc = [['green', 'blue', 'green'], ['red', 'red', 'blue'], ['red', 'blue', 'green']]
+# boxc = [['green', 'blue', 'green'], ['red', 'red', 'blue'], ['red', 'blue', 'green']]
 
-path, color, cost, Sort = BoxPath([2,1], boxc)
-print(path, color, cost, Sort)
+# path, color, cost, Sort = BoxPath([2,1], boxc)
+# print(path, color, cost, Sort)
