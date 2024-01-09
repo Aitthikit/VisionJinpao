@@ -3,6 +3,14 @@ import pyrealsense2 as rs
 import math
 import cv2
 from itertools import permutations
+import seaborn as sns  
+import matplotlib.pyplot as plt
+import seaborn as sns
+from scipy.signal import find_peaks
+import statistics
+
+
+
 known_length = 110
 known_height = 110
 # focal_length = 650
@@ -110,7 +118,7 @@ def BoxPath(robot_init ,BoxColor):
 
     # create box and position of box in index
     Box = [[BoxColor[i][j][0], [i, j]] for i in range(3) for j in range(3)]
-    print(Box)
+    # print(Box)
     # create permutation of possible way to pick box
     color_permutations = permutations(Box,3)
 
@@ -190,3 +198,100 @@ def create_hatty(mask):
     mask = cv2.dilate(mask,kernel,iterations = 1)
     mask = cv2.erode(mask,kernel,iterations = 1)
     return mask
+
+
+def flatten_data(data):
+    color = []
+    for sublist in data:
+        for subsublist in sublist:
+            # print(subsublist)
+            # print(np.array(subsublist, dtype = 'object')[:,0])
+            color.append(np.array(subsublist, dtype = 'object')[:,0].tolist())
+    
+    return np.array([point[1] for sublist in data for subsublist in sublist for point in subsublist if isinstance(point[1], list)]), np.array(color).reshape(-1)
+
+def plot_3d_scatter(data, x_label='X Axis', y_label='Y Axis', z_label='Z Axis', title=None):
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plotting all data points
+    ax.scatter(data[:, 0], data[:, 1], data[:, 2], c='blue', label='Raw Data')
+
+    # Set axis labels
+    ax.set_xlabel(x_label)
+    ax.set_ylabel(y_label)
+    ax.set_zlabel(z_label)
+
+    # Add a legend
+    ax.legend()
+
+    # Set plot title if provided
+    if title:
+        plt.title(title)
+
+    # Show the plot
+    plt.show()
+# Flattening the data to get only the position coordinates
+
+def positionFilter(data):
+    flat_data, flat_color = flatten_data(data)
+    Color = []
+    for i in range(3):
+        Color.append([statistics.mode(flat_color[3*i::9]),statistics.mode(flat_color[3*i+1::9]),statistics.mode(flat_color[3*i+2::9])])
+    # print(Color)
+    
+    # print(flat_data)
+    # Compute the KDE values
+    kde_values_x = sns.kdeplot(flat_data[:,0]).get_lines()[0].get_data()
+
+    kde_values_y = sns.kdeplot(flat_data[:,1]).get_lines()[1].get_data()
+
+    kde_values_z = sns.kdeplot(flat_data[:,2]).get_lines()[2].get_data()
+
+
+
+    # print(kde_values)
+
+    # Find multiple peaks_x using scipy's find_peaks_x
+    peaks_x, _ = find_peaks(kde_values_x[1], height=0)  # Adjust the height threshold as needed
+    peaks_y, _ = find_peaks(kde_values_y[1], height=0)  # Adjust the height threshold as needed
+    peaks_z, _ = find_peaks(kde_values_z[1], height=0)  # Adjust the height threshold as needed
+    # print(peaks_x)
+
+
+    # Get the positions and values of the peaks_x
+    peak_positions_x = (kde_values_x[0][peaks_x])
+    peak_density_x = (kde_values_x[1][peaks_x])
+    peak_positions_y = kde_values_y[0][peaks_y]
+    peak_density_y = (kde_values_y[1][peaks_y])
+    peak_positions_z = kde_values_z[0][peaks_z]
+    peak_density_z = (kde_values_z[1][peaks_z])
+    peak_position_x = []
+    peak_position_y = []
+    peak_position_z = []
+
+    highest_indices = sorted(range(len(peak_density_x)), key=lambda i: peak_density_x[i], reverse=True)[:3]
+    for i in highest_indices:
+        peak_position_x.append(peak_positions_x[i])
+
+    highest_indices = sorted(range(len(peak_density_y)), key=lambda i: peak_density_y[i], reverse=True)[:3]
+    for i in highest_indices:
+        peak_position_y.append(peak_positions_y[i])
+
+    highest_indices = sorted(range(len(peak_density_z)), key=lambda i: peak_density_z[i], reverse=True)[:3]
+    for i in highest_indices:
+        peak_position_z.append(peak_positions_z[i])
+
+    peak_position_x = sorted(peak_position_x)
+    peak_position_y = sorted(peak_position_y, reverse=True)
+    peak_position_z = peak_position_z[0]
+
+    Position = []
+    for i in range(len(peak_position_x)):
+        Temp = []
+        for k in range(len(peak_position_y)):
+            Temp.append([Color[i][k],[peak_position_x[k],peak_position_y[i],peak_position_z]])
+        Position.append(Temp)
+    return Position
+
+
