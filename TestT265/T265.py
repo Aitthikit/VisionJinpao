@@ -132,7 +132,7 @@ try:
             contour_area = cv2.contourArea(cnt)
             if contour_area > 100:#limit lower BB
                 x3, y3, w3, h3 = cv2.boundingRect(cnt)
-                center = int(x3+(w3/2)), int(h3-(w3/2))
+                center = int(x3+(w3/2)), int(h3-(w3/2)) #center of place (000,000)
                 # cv2.rectangle(depth_roi_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
                 cv2.circle(color_data, center, int((w3/4)+(h3/2)), (0, 0, 255), 5)
                 cv2.circle(color_data, center, 1, (0, 255, 0), 5)
@@ -146,7 +146,7 @@ try:
         for cnt in depth1.find_Depth()[1]:
             contour_area = cv2.contourArea(cnt)
             if contour_area > 400 and contour_area < 5000:#limit lower BB
-                x, y, w, h = cv2.boundingRect(cnt)
+                x, y, w, h = cv2.boundingRect(cnt) # พื้นที่ของแท่งวางธงที่สามารถอยู่ได้ x = 000 , y = 000 , w = 000 , h = 000
                 cv2.rectangle(color_data, (x, y), (x + w, y + h), (0, 0, 255), 2)
         for cnt in edges1.find_Edge()[2]:
             contour_area = cv2.contourArea(cnt)
@@ -159,8 +159,8 @@ try:
                     min_y = min(rect[1] for rect in rect_list)
                     max_x = max(rect[0] + rect[2] for rect in rect_list)
                     max_y = max(rect[1] + rect[3] for rect in rect_list)
-                    mid_x = int(max_x-((max_x-min_x)/2))
-                    mid_y = int(max_y-((max_y-min_y)/2))
+                    mid_x = int(max_x-((max_x-min_x)/2)) # ตำแหน่งของจุดศูนย์กลางรูในแกน X
+                    mid_y = int(max_y-((max_y-min_y)/2)) # ตำแหน่งของจุดศูนย์กลางรูในแกน Y
                     if len(rect_list) > 2:
                         rect_list = rect_list[-2:-1]
                         distance = cv2.pointPolygonTest((np.array([center], dtype=np.int32)), (mid_x, mid_y), True)
