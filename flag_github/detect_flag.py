@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # cap = cv2.VideoCapture(0)
-cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\VisionJinpao\\flag_github\\flag_topview.mp4")
+cap = cv2.VideoCapture(r"C:\\Users\AAA\Desktop\\Jinpao\\VisionJinpao\\flag_github\\flag_topview.mp4")
 if not cap.isOpened():
     print("Error: Could not open camera.")
     exit()

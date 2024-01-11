@@ -2,20 +2,6 @@ import numpy as np
 import pyrealsense2 as rs
 import cv2
 import time
-class LowPassFilter:
-    def __init__(self, alpha):
-        self.alpha = alpha
-        self.filtered_value = None
-
-    def update(self, new_value):
-        if self.filtered_value is None:
-            self.filtered_value = new_value
-        else:
-            self.filtered_value = self.alpha * new_value + (1 - self.alpha) * self.filtered_value
-
-        return self.filtered_value
-lowpass_filter_x = LowPassFilter(alpha=0.6)
-lowpass_filter_y = LowPassFilter(alpha=0.7)
 
 pipeline = rs.pipeline()
 config = rs.config()
@@ -30,20 +16,43 @@ x = 0
 y = 0
 h = 0
 w = 0
-min_distance = 0.59  # in meters
-max_distance = 0.7  # in meters
-scale = ((640*np.sin(np.radians(34.5)))*2.0)/960.0
+# min_distance = 0.47  # in meters
+# max_distance = 0.68  # in meters
+# min_distance2 = 0.6  # in meters
+# max_distance2 = 0.68  # in meters
+slice_multi = 0.24 
+min_distance = 0.47  # in meters
+max_distance = 0.57  # in meters
+min_distance2 = 0.62  # in meters
+max_distance2 = 0.65  # in meters
+scale = ((700*np.sin(np.radians(34.5)))*2.0)/960.0
+center = (100,100)
 mid_pixel = (480,270)
 gap = 130
-state_Gap1 = -70
-state_Gap2 = -130
-state_Gap3 = -190
+state_Gap1 = 10 #10cm
+state_Gap2 = 50 #15cm
+state_Gap3 = 100 #20cm
 rect_list = []
+highlight1 = (255,0,0)
+highlight2 = (255,0,0)
+highlight3 = (255,0,0)
+ellipse_axes_lengths = (int(90/scale),int(30/scale))
+ellipse_axes_lengths2 = (int(140/scale),int(90/scale))
+ellipse_axes_lengths3 = (int(200/scale),int(150/scale))
 start_time = time.time()
 config.enable_stream(rs.stream.depth, 1280, 720, rs.format.z16, 30)
 config.enable_stream(rs.stream.color, 1280, 720, rs.format.bgr8, 30)
 pipeline.start(config)
-align = rs.align(rs.stream.color)
+def align(pipeline):
+        # Wait for a new frame
+    frames = pipeline.wait_for_frames()
+    align = rs.align(rs.stream.color)
+    aligned_frames = align.process(frames)
+    depth_frame = aligned_frames.get_depth_frame()
+    color_frame = aligned_frames.get_color_frame()
+    depth_data = cv2.resize(np.asanyarray(depth_frame.get_data()),(960,540))
+    color_data = cv2.resize(np.asanyarray(color_frame.get_data()),(960,540))
+    return depth_data, color_data
 def pixel_convert(mid_pixel,pixel):
     x = pixel[0]-mid_pixel[0]
     y = pixel[1]-mid_pixel[1]
@@ -55,33 +64,59 @@ def create_hatty(mask):
     mask = cv2.dilate(mask,kernel,iterations = 1)
     mask = cv2.erode(mask,kernel,iterations = 1)
     return mask
+def get_ellipse_contour(center, axes_lengths, angle):
+    # Create a black image
+    mask = np.zeros((540, 960), dtype=np.uint8)
+    # Draw the ellipse on the mask
+    cv2.ellipse(mask, center, axes_lengths, angle, 0, 360, 255, thickness=cv2.FILLED)
+    # Find contours in the binary mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    return contours
 def is_point_inside_circle(point, circle_center, circle_radius):
     distance = np.sqrt((point[0] - circle_center[0])**2 + (point[1] - circle_center[1])**2)
     return distance <= circle_radius
+class LowPassFilter:
+    def __init__(self, alpha):
+        self.alpha = alpha
+        self.filtered_value = None
+
+    def update(self, new_value):
+        if self.filtered_value is None:
+            self.filtered_value = new_value
+        else:
+            self.filtered_value = self.alpha * new_value + (1 - self.alpha) * self.filtered_value
+
+        return self.filtered_value
+lowpass_filter_x = LowPassFilter(alpha=0.5)
+lowpass_filter_y = LowPassFilter(alpha=0.5)
 class Detection:
     def __init__(self, frame):
         self.frame = frame
     def find_Depth(self):
         depth_roi_mask = np.logical_and(self.frame >= min_distance * 1000, depth_data <= max_distance * 1000)
+        depth_roi_mask2 = np.logical_and(self.frame >= min_distance2 * 1000, depth_data <= max_distance2 * 1000)
         # Apply the mask to the depth data
         depth_roi = np.where(depth_roi_mask, self.frame, 0)
+        depth_roi2 = np.where(depth_roi_mask2, self.frame, 0)
         # Create a grayscale image from the ROI data
         depth_roi_image = np.uint8(255-(depth_roi / np.max(depth_roi) * 255))
-        depth_roi_image2 = np.uint8((depth_roi / np.max(depth_roi) * 255))
+        depth_roi_image2 = np.uint8((depth_roi2 / np.max(depth_roi2) * 255))
         _, binary_image = cv2.threshold(depth_roi_image, 128, 255, cv2.THRESH_BINARY)
-        binary_image = create_hatty(binary_image)
+        # binary_image = create_hatty(binary_image)
         contours_black, _ = cv2.findContours(binary_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(depth_roi_image, contours_black, -1, (255), thickness=cv2.FILLED)
         _, binary_image2 = cv2.threshold(depth_roi_image2, 128, 255, cv2.THRESH_BINARY)
         binary_image2 = create_hatty(binary_image2)
         contours_white, _ = cv2.findContours(binary_image2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.imshow("asd",depth_roi_image2)
         return depth_roi_image,contours_black,contours_white
     def find_Edge(self):
         color_image = self.frame
         # cv2.imshow("RGB Frame with ROI2", color_image)
         # cv2.imshow("RGB Frame with ROI", color_data)
         gray_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2GRAY)
-        gray_blurred = cv2.GaussianBlur(gray_image, (11, 11), 20)
-        edges = cv2.Canny(gray_blurred, 50,70)
+        gray_blurred = cv2.GaussianBlur(gray_image, (9, 9), 10)
+        edges = cv2.Canny(gray_blurred, 150,100)
         contours_edge, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(edges, contours_edge, -1, (255), thickness=cv2.FILLED)
         return color_image,edges,contours_edge
@@ -91,13 +126,12 @@ class Detection:
         gray_blurred = cv2.GaussianBlur(gray_image, (11, 11), 20)
         edges = cv2.Canny(gray_blurred, 50,70)
         return edges,gray_blurred
-    
-
 while True:
     frame_count += 1
     # Wait for a new frame
     frames = pipeline.wait_for_frames()
     # Align the depth frame with the color frame
+    align = rs.align(rs.stream.color)
     aligned_frames = align.process(frames)
     depth_frame = aligned_frames.get_depth_frame()
     color_frame = aligned_frames.get_color_frame()
@@ -106,7 +140,6 @@ while True:
     # Access depth data as a numpy array
     depth_data = cv2.resize(np.asanyarray(depth_frame.get_data()),(960,540))
     # Access color data as a numpy array
-    
     color_data = cv2.resize(np.asanyarray(color_frame.get_data()),(960,540))
     depth1 = Detection(depth_data)
     edges1 = Detection(color_data)
@@ -172,10 +205,10 @@ while True:
     #                     print("3",i[0], i[1])
     for cnt in depth1.find_Depth()[2]:
         contour_area = cv2.contourArea(cnt)
-        if contour_area > 100:#limit lower BB
+        if contour_area > 1500:#limit lower BB
             x3, y3, w3, h3 = cv2.boundingRect(cnt)
             center = int(x3+(w3/2)), int(h3-(w3/2)) #center of place (000,000)
-            # cv2.rectangle(depth_roi_image, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            cv2.rectangle(color_data, (x3, y3), (x3 + w3, y3 + h3), (0, 0, 255), 2)
             cv2.circle(color_data, center, int((w3/4)+(h3/2)), (0, 0, 255), 5)
             cv2.circle(color_data, center, 1, (0, 255, 0), 5)
             if center[1] not in range(0,30):
@@ -186,13 +219,55 @@ while True:
                 #     # print("move to right",0-center[1])
             else:
                 break
-    cv2.line(color_data, (center[0]+gap,0), (center[0]+gap, 540), (0, 255, 0), 3)
-    cv2.line(color_data, (center[0],0), (center[0], 540), (0, 255, 0), 3)
+    # cv2.line(color_data, (center[0]+gap,0), (center[0]+gap, 540), (0, 255, 0), 3)
+    # cv2.line(color_data, (center[0],0), (center[0], 540), (0, 255, 0), 3)
+    ellipse_center = (center[0]-int((480-center[0])*slice_multi),center[1])
+    print(ellipse_center)
+    cv2.ellipse(color_data, ellipse_center, (int(100/scale),int(50/scale)), 0, 0, 360, highlight1, 5)
+    cv2.ellipse(color_data, ellipse_center, (int(150/scale),int(110/scale)), 0, 0, 360, highlight2, 5)
+    cv2.ellipse(color_data, ellipse_center, (int(200/scale),int(160/scale)), 0, 0, 360, highlight3, 5)
+    # cv2.ellipse(color_data, ellipse_center, (int(100/scale),int(80/scale)), 0, 0, 360, highlight1, 5)
+    # cv2.ellipse(color_data, ellipse_center, (int(150/scale),int(140/scale)), 0, 0, 360, highlight2, 5)
+    # cv2.ellipse(color_data, ellipse_center, (int(200/scale),int(190/scale)), 0, 0, 360, highlight3, 5)
     for cnt in depth1.find_Depth()[1]:
         contour_area = cv2.contourArea(cnt)
         if contour_area > 400 and contour_area < 5000:#limit lower BB
             x, y, w, h = cv2.boundingRect(cnt) # พื้นที่ของแท่งวางธงที่สามารถอยู่ได้ x = 000 , y = 000 , w = 000 , h = 000
-            cv2.rectangle(color_data, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # cv2.rectangle(color_data, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            # cv2.circle(color_data,(int(x+w/2),int(y+h/2)), 1, (0, 255, 255), 5)
+            contours = get_ellipse_contour(ellipse_center, ellipse_axes_lengths, 0)
+            contours2 = get_ellipse_contour(ellipse_center, ellipse_axes_lengths2, 0)
+            contours3 = get_ellipse_contour(ellipse_center, ellipse_axes_lengths3, 0)
+            # Draw the contours on a white image
+            # contour_image = np.ones((540, 960, 3), dtype=np.uint8) * 255
+            # cv2.drawContours(contour_image, contours3, -1, (255, 0, 0), -1)
+            # cv2.drawContours(contour_image, contours2, -1, (0, 255, 0), -1)
+            # cv2.drawContours(contour_image, contours, -1, (0, 0, 255), -1)
+            if len(contours) != 0:
+                distance = cv2.pointPolygonTest(contours[0], (x+w/2, y), measureDist=True)
+                distance2 = cv2.pointPolygonTest(contours2[0], (x+w/2, y), measureDist=True)
+                distance3 = cv2.pointPolygonTest(contours3[0], (x+w/2, y), measureDist=True)
+                if y > 5:
+                    if distance >= 0:
+                        print("Point is inside 1",y)
+                        highlight1 = (0,255,0)
+                        highlight2 = (255,0,0)
+                        highlight3 = (255,0,0)
+                    elif distance < 0 and distance2 >= 0:
+                        print("Point is inside 2",y)
+                        highlight1 = (255,0,0)
+                        highlight2 = (0,255,0)
+                        highlight3 = (255,0,0)
+                    elif distance2 < 0 and distance3 >= 0:
+                        print("Point is inside 3",y) 
+                        highlight1 = (255,0,0)
+                        highlight2 = (255,0,0)
+                        highlight3 = (0,255,0)
+                    else:
+                        print("Point is outside",y)
+                        highlight1 = (255,0,0)
+                        highlight2 = (255,0,0)
+                        highlight3 = (255,0,0)
     for cnt in edges1.find_Edge()[2]:
         contour_area = cv2.contourArea(cnt)
         if contour_area < 500:#limit lower BB
@@ -211,33 +286,34 @@ while True:
                 if len(rect_list) > 2:
                     rect_list = rect_list[-2:-1]
                     distance = cv2.pointPolygonTest((np.array([center], dtype=np.int32)), (mid_x, mid_y), True)
+                    cv2.circle(color_data, center, abs(int(distance)), (0, 255, 255), 5)
                     if mid_x in range(x,x+w) and mid_y in range(y,y+h) and (mid_y-y)<17:
                         cv2.circle(color_data, (mid_x, mid_y), 1, (0, 255, 255), 5)
                         print(pixel_convert(mid_pixel,(mid_x,mid_y)),distance)
-                        if mid_x in range(center[0]-gap,center[0]+gap):
-                            if distance > state_Gap1:
-                                print("1")
-                            elif distance <= state_Gap1 and distance > state_Gap2:
-                                print("2")
-                            elif distance <= state_Gap2 and distance > state_Gap3:
-                                print("3")
-    circles = cv2.HoughCircles(
-            edges1.find_flag()[1],
-            cv2.HOUGH_GRADIENT,
-            dp=1,
-            minDist=100,
-            param1=7,
-            param2=25,
-            minRadius=10,
-            maxRadius=27
-        )
-    if circles is not None:
-        circles = np.uint16(np.around(circles))
-        for i in circles[0, :]:
-            # Draw circles on the original frame
-            cv2.circle(color_data, (i[0], i[1]), i[2], (0, 255, 0), 2)  # outer circle
-            cv2.circle(color_data, (i[0], i[1]), 2, (0, 0, 255), 3)  # center
-            print(i[0], i[1])
+                        # if mid_x in range(center[0]-gap,center[0]+gap):
+                        #     if distance > state_Gap1:
+                        #         print("1")
+                        #     elif distance <= state_Gap1 and distance > state_Gap2:
+                        #         print("2")
+                        #     elif distance <= state_Gap2 and distance > state_Gap3:
+                        #         print("3")
+    # circles = cv2.HoughCircles(
+    #         edges1.find_flag()[1],
+    #         cv2.HOUGH_GRADIENT,
+    #         dp=1,
+    #         minDist=100,
+    #         param1=7,
+    #         param2=25,
+    #         minRadius=10,
+    #         maxRadius=27
+    #     )
+    # if circles is not None:
+    #     circles = np.uint16(np.around(circles))
+    #     for i in circles[0, :]:
+    #         # Draw circles on the original frame
+    #         cv2.circle(color_data, (i[0], i[1]), i[2], (0, 255, 0), 2)  # outer circle
+    #         cv2.circle(color_data, (i[0], i[1]), 2, (0, 0, 255), 3)  # center
+    #         print(i[0], i[1])
             # Draw circles on the black image
           # center
     # cv2.drawContours(edges,contours_red,-1,(255,0,0),2)
@@ -248,6 +324,7 @@ while True:
     cv2.imshow("RGB Frame with ROI", color_data)
     # print(scale)
     cv2.imshow("ROI Frame", depth1.find_Depth()[0])
+    # print(100/scale,150/scale,200/scale)
     # Wait for a key press, and exit the loop if 'q' is pressed
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
