@@ -107,7 +107,7 @@ def create_ROI(min_distance, max_distance, color_data, depth_data):
     new_frame = np.zeros_like(color_data)
     cv2.drawContours(new_frame, contours, -1, (255, 255, 255), thickness=cv2.FILLED)
     contour_area = cv2.bitwise_and(color_data, color_data, mask=new_frame[:, :, 0])
-    return contour_area
+    return depth_roi_mask, contour_area
 
 def cost_function(color, position, robot_pos):
         Vx = 1 # velocity of x in box/sec
@@ -430,8 +430,8 @@ class BOXDETECTION:
         # self.upper_blue = np.array([110, 255, 255])
 
 
-        self.lower_green = np.array([71, 100, 10]) 
-        self.upper_green = np.array([89, 255, 255])
+        self.lower_green = np.array([40, 70, 10]) 
+        self.upper_green = np.array([100, 255, 255])
 
         self.lower_red = np.array([156, 100, 10])
         self.upper_red = np.array([179, 255, 255])
@@ -564,6 +564,219 @@ class BOXDETECTION:
                 #     cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
                 #     cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
                 #     cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+            
+        # cv2.putText(contour_area_image, "Angle : " + str(angle),(1000,650), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+        cv2.imshow("RGB Frame", contour_area_image)
+        # cv2.imshow("Plot ", cv2.resize(plot,(plot.shape[1]//scale_dis,plot.shape[0]//scale_dis)))
+
+        return Box_Pos, Box_Color
+    
+        
+    def pose_calculate(self,data):
+        temp = [["","",""],["","",""],["","",""]]
+        
+
+        check = []
+
+        min_x = min_x = min(point[0] for point in data)
+        max_x = max(point[0] for point in data)
+        min_y = min(point[1] for point in data)
+        max_y = max(point[1] for point in data)
+
+        grid_x = ((max_x-min_x) / 3)+1
+        grid_y = ((max_y-min_y) / 3)+1
+        print(data)
+        for i in data:
+            column = int((i[0]-min_x) // grid_x)
+            roll = int((i[1]-min_y) // grid_y)
+            # print(str(i[3]) , (i[0] - min_x)/grid_x)
+            temp[roll][column] = [i[3] , i[2]]
+            self.ans[roll][column] = [str(i[3]),[i[4][0],i[4][1],i[2]]]
+            # print(temp)
+
+        for i in range(len(temp)):
+            check.append("" not in temp[i])
+            
+        if all(check) == True:
+            delta_x = max_x - min_x
+            d_left = (temp[0][0][1] + temp[1][0][1] + temp[2][0][1]) / 3
+            d_right = (temp[0][2][1] + temp[1][2][1] + temp[2][2][1]) / 3
+            delta_depth = d_right - d_left
+            angle_radians = math.atan2(delta_depth, delta_x)
+            angle_degrees = round(math.degrees(angle_radians),4)
+            return self.ans, angle_degrees
+        else :
+            return self.ans, 99999
+    
+    def mask_show(self):
+        cv2.imshow("mask blue", self.mask_blue)
+        cv2.imshow("mask red", self.mask_red)
+        cv2.imshow("mask green", self.mask_green)
+
+
+class STRIPDETECTION:
+    def __init__(self):
+        self.box_list = []
+        self.ans =[[[],[],[]],[[],[],[]],[[],[],[]]]
+        # self.lower_saturation = 0
+        # self.upper_saturation = 255
+
+
+        # foo
+        # self.lower_green = np.array([70, 55, 60]) 
+        # self.upper_green = np.array([85, 255, 255])
+
+        # self.lower_red = np.array([170, 55, 50])
+        # self.upper_red = np.array([180, 255, 255])
+
+        # self.lower_blue = np.array([105, 80, 70])
+        # self.upper_blue = np.array([110, 255, 255])
+
+        # jp
+        # self.lower_green = np.array([40, 100, 0]) 
+        # self.upper_green = np.array([100, 255, 255])
+
+        # self.lower_red = np.array([109, 110, 0])
+        # self.upper_red = np.array([255, 255, 255]) # 120 255
+
+        # self.lower_blue = np.array([95, 110, 0])
+        # self.upper_blue = np.array([110, 255, 255])
+
+
+        self.lower_green = np.array([40, 70, 10]) 
+        self.upper_green = np.array([100, 255, 255])
+
+        self.lower_red = np.array([156, 100, 10])
+        self.upper_red = np.array([179, 255, 255])
+
+        self.lower_blue = np.array([98, 100, 10])
+        self.upper_blue = np.array([110, 255, 255])
+
+        # Debug Var
+        self.mask_blue = None
+        self.mask_red = None
+        self.mask_green = None
+
+    def HSV_filtering(self, contour_area, depth_data):
+        # bgr2hsv
+        hsv = cv2.cvtColor(contour_area,cv2.COLOR_BGR2HSV)
+        
+        # create a mask 
+        mask_red = cv2.medianBlur(cv2.inRange(hsv, self.lower_red, self.upper_red),7)
+        mask_green = cv2.medianBlur(cv2.inRange(hsv, self.lower_green, self.upper_green),7)
+        mask_blue = cv2.medianBlur(cv2.inRange(hsv,self. lower_blue, self.upper_blue),7)
+        
+        self.mask_red = create_hatty(mask_red)
+        self.mask_green = create_hatty(mask_green)
+        self.mask_blue = create_hatty(mask_blue)
+
+        # find contours 
+        contours_red, _ = cv2.findContours(self.mask_red, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_green, _ = cv2.findContours(self.mask_green, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_blue, _ = cv2.findContours(self.mask_blue, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)       
+
+        contour_area_image = contour_area.copy()
+        plot = np.zeros_like(contour_area_image)
+        cv2.circle(contour_area_image,(contour_area_image.shape[1]//2 ,contour_area_image.shape[0]//2 ),2,(200,200,200),3)      # Create Camera Frame
+        Box_Color = []
+        Box_Pos = []
+        for contour in contours_red:
+            color = (0,0,255)
+            contour_area = cv2.contourArea(contour)
+            
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)    
+            #     if (w/h < 1.5) & (h/w < 1.5):
+            #         pos = find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+            #         depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+            #         Box_Color.append("red")
+            #         Box_Pos.append([pos[0], pos[1], depth_value])
+            #         cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            #         cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            #         cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+            #         cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+            #         cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,color,3)  
+            #         cv2.putText(contour_area_image, "x: " + str(pos) , (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    
+                # if(w/h>1.5) & (w/h<2.5) :
+                    
+                #     x1,y1,w1,h1, x_s,y_s,w_s,h_s = separate_hatty(contour,color)
+                #     pos = find_pos(contour_area_image,w1,x1+int(w1)//2 ,y1+int(h1)//2)
+                #     depth_value = depth_data[y1+(h1//2),x1+(w1//2)]
+                #     Box_Color.append("red")
+                #     Box_Pos.append([pos[0], pos[1], depth_value])
+                #     cv2.circle(contour_area_image,(x1+int(w1)//2 ,y1+int(h1)//2),2,(255,255,255),10) # Center of circle
+                #     cv2.circle(plot,(x1+int(w1)//2 ,y1+int(h1)//2),2,color,3) # Center of circle
+                    
+                # else :
+                #     cv2.putText(plot, "w: " + str(w) + "h: " + str(h), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                if(w/h>4.5) & (w/h<13):
+                    cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+            
+
+        for contour in contours_green:
+            color = (0,255,0)
+            contour_area = cv2.contourArea(contour)
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)                  
+                # if (w/h < 1.5) & (h/w < 1.5):
+                #     pos = find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+                #     depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+                #     Box_Color.append("green")
+                #     Box_Pos.append([pos[0], pos[1], depth_value])
+                #     cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+                #     cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+                #     cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,color,3) 
+                #     cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                #     cv2.putText(plot, "x: " + str(x) + "y: " + str(y), (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    
+                # if(w/h>1.5) & (w/h<2.5) :
+                #     x1,y1,w1,h1, x_s,y_s,w_s,h_s = separate_hatty(contour,color)
+                #     pos = find_pos(contour_area_image,w1,x1+int(w1)//2 ,y1+int(h1)//2)
+                #     depth_value = depth_data[y1+int(h1)//2,x1+int(w1)//2]
+                #     Box_Color.append("green")
+                #     Box_Pos.append([pos[0], pos[1], depth_value])
+                #     cv2.circle(contour_area_image,(x1+(w1//2) ,y1+(h1//2)),2,(255,255,255),10) # Center of circle
+                #     cv2.circle(plot,(x1+int(w1)//2 ,y1+int(h1)//2),2,color,3) # Center of circle
+                    
+                    
+                if(w/h>4.5) & (w/h<13):
+                    cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+
+        for contour in contours_blue:
+            color = (255,0,0)
+            contour_area = cv2.contourArea(contour)
+            if contour_area >= 1000:
+                x, y, w, h = cv2.boundingRect(contour)
+                # if (w/h < 1.5) & (h/w < 1.5):
+                    # pos = find_pos(contour_area_image,w,x+int(w)//2 ,y+int(h)//2)
+                    # depth_value = depth_data[y+int(h)//2,x+int(w)//2]
+                    # Box_Color.append("blue")
+                    # Box_Pos.append([pos[0], pos[1], depth_value])
+                    # cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+                    # cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
+                    # cv2.circle(plot,(x+int(w)//2 ,y+int(h)//2 ),2,color,3) 
+                    # cv2.putText(plot, "Depth: " + str(depth_value), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    # cv2.putText(contour_area_image, "x: " + str(pos) , (x, y+30), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                # if(w/h>1.5) & (w/h<2.5) :
+                #     x1,y1,w1,h1, x_s,y_s,w_s,h_s = separate_hatty(contour,color)
+                #     pos = find_pos(contour_area_image,w1,x1+int(w1)//2 ,y1+int(h1)//2)
+                #     depth_value = depth_data[y1+int(h1)//2,x1+int(w1)//2]
+                #     Box_Color.append("blue")
+                #     Box_Pos.append([pos[0], pos[1], depth_value])
+                #     cv2.circle(contour_area_image,(x1+(w1//2) ,y1+(h1//2)),2,(255,255,255),10) # Center of circle
+                #     cv2.circle(plot,(x1+int(w1)//2 ,y1+int(h1)//2),2,color,3) # Center of circle
+                    
+                if(w/h>4.5) & (w/h<13):
+                    cv2.rectangle(contour_area_image, (x, y), (x + w, y + h),color, 2)
+                    cv2.putText(contour_area_image, "Strip " + str(w) + "  " + str(h), (x, y+10), cv2.FONT_HERSHEY_SIMPLEX,0.5, (255,255,255), 2)
+                    cv2.circle(contour_area_image,(x+int(w)//2 ,y+int(h)//2 ),2,(255,255,255),3)
             
         # cv2.putText(contour_area_image, "Angle : " + str(angle),(1000,650), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
         cv2.imshow("RGB Frame", contour_area_image)

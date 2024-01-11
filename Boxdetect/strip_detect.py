@@ -4,7 +4,7 @@ import cv2
 import time
 import my_Function as ff
 import math
-from my_Function import BOXDETECTION
+from my_Function import STRIPDETECTION
 
 # Initialize the RealSense pipeline
 pipeline = rs.pipeline()
@@ -24,19 +24,19 @@ time.sleep(2)
 state = 'Idle'
 frame_count = 0
 start_time = time.time()
-def update_mask(x):
-    global min_h
-    global max_h
-    min_h = cv2.getTrackbarPos('min','HueR')
-    max_h = cv2.getTrackbarPos('max','HueR')
+# def update_mask(x):
+#     global min_h
+#     global max_h
+#     min_h = cv2.getTrackbarPos('min','HueR')
+#     max_h = cv2.getTrackbarPos('max','HueR')
 
-cv2.namedWindow("HueR")
-min_h = 109
-max_h = 255
-# i=0
+# cv2.namedWindow("HueR")
+# min_h = 109
+# max_h = 255
+# # i=0
 
-cv2.createTrackbar('min','HueR',min_h,255,update_mask)
-cv2.createTrackbar('max','HueR',max_h,255,update_mask)
+# cv2.createTrackbar('min','HueR',min_h,255,update_mask)
+# cv2.createTrackbar('max','HueR',max_h,255,update_mask)
 # fourcc = cv2.VideoWriter_fourcc(*'XVID')
 # out = cv2.VideoWriter('output_550mm_place2.avi', fourcc, 20.0, (1280, 720))
 stack_weight=0.1
@@ -74,14 +74,14 @@ try:
         # Display the result
         # cv2.imshow("Real-Time Stacking", color_data)
         # Create ROI from depth cameara
-        roi_mask, contour_area = ff.create_ROI(0.7,1.2,color_data, depth_data)
+        roi_mask, contour_area = ff.create_ROI(0.2,0.7,color_data, depth_data)
         # out.write(contour_area)
         cv2.imshow("Roi",contour_area)
         # find box
-        Box_Pos, Box_Color = BoxDetect.HSV_filtering(contour_area, depth_data)
+        Box_Pos, Box_Color = StripDetect.HSV_filtering(contour_area, depth_data)
         # print(Box_Pos)
         # print(Box_Color)
-        BoxDetect.mask_show()
+        StripDetect.mask_show()
         key = cv2.waitKey(1) & 0xFF
         # press q for exit
         if key == ord('q'):

@@ -15,6 +15,11 @@ def get_hsv_range(frame, point1, point2):
     # Calculate the min and max HSV values
     min_hue = np.min(hsv_roi[:, :, 0])
     max_hue = np.max(hsv_roi[:, :, 0])
+    min_s = np.min(hsv_roi[:, :, 1])
+    max_s = np.max(hsv_roi[:, :, 1])
+    min_v = np.min(hsv_roi[:, :, 2])
+    max_v = np.max(hsv_roi[:, :, 2])
+    print(min_s,max_s,min_v,max_v)
 
     return min_hue, max_hue
 
