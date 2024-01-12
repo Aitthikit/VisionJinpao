@@ -17,7 +17,7 @@ target_image = cv2.imread('target.jpg')
 Position = []
 timestamp = 0
 
-StripDetect = STRIPDETECTION()
+BoxDetect = BOXDETECTION()
 
 time.sleep(2)
 
